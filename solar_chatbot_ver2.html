@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>국립과천과학관 AI 도슨트</title>
+    <style>
+      @font-face {
+        font-family: "Pretendard";
+        src: url("https://cdn.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-Regular.woff")
+          format("woff");
+        font-weight: normal;
+        font-style: normal;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: "Pretendard", sans-serif;
+        background-color: #f0f4f8;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        height: 100vh;
+      }
+
+      .title-box {
+        width: 100%;
+        background-color: #4a90e2;
+        color: white;
+        text-align: center;
+        padding: 20px 0;
+        font-size: 24px;
+        font-weight: bold;
+      }
+
+      .chat-container {
+        width: 500px;
+        height: 600px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        margin-top: 20px;
+      }
+
+      .chat-box {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .input-area {
+        display: flex;
+        padding: 10px;
+        border-top: 1px solid #ddd;
+      }
+
+      input {
+        flex: 1;
+        padding: 10px;
+        font-size: 16px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+      }
+
+      button {
+        margin-left: 10px;
+        padding: 10px 20px;
+        font-size: 16px;
+        background-color: #4a90e2;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+
+      .bubble {
+        display: inline-block;
+        max-width: 80%;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        padding: 10px 14px;
+        border-radius: 16px;
+        margin: 8px;
+        line-height: 1.4;
+        white-space: pre-wrap;
+      }
+
+      .user {
+        background-color: #d0e6ff;
+        align-self: flex-end;
+        border-bottom-right-radius: 0;
+      }
+
+      .bot {
+        background-color: #eee;
+        align-self: flex-start;
+        border-bottom-left-radius: 0;
+      }
+
+      a {
+        color: #0077cc;
+        text-decoration: underline;
+      }
+
+      .name-prompt {
+        margin-top: 40px;
+        text-align: center;
+      }
+
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="title-box">국립과천과학관 AI 도슨트</div>
+
+    <!-- 이름 입력 단계 -->
+    <div class="name-prompt" id="name_prompt">
+      <h3>안녕하세요! 먼저 이름을 알려주세요 😊</h3>
+      <input
+        id="name_input"
+        placeholder="이름을 입력하세요"
+        onkeydown="handleNameKey(event)"
+      />
+      <button onclick="setName()">확인</button>
+    </div>
+
+    <!-- 챗봇 인터페이스 -->
+    <div class="chat-container hidden" id="chat_ui">
+      <div class="chat-box" id="chat_box"></div>
+      <div class="input-area">
+        <input
+          id="user_input"
+          placeholder="질문을 입력하세요"
+          onkeydown="handleKey(event)"
+        />
+        <button onclick="send()">보내기</button>
+      </div>
+    </div>
+
+    <script>
+      let userName = "";
+
+      function formatReply(text) {
+        // ### 제거
+        text = text.replace(/^###\s*/gm, "");
+
+        // 굵은 글씨 처리 + 이모지 삽입
+        text = text.replace(/\*\*(.*?)\*\*/g, (match, p1) => {
+          let emoji = "";
+          if (/천체|우주|별/.test(p1)) emoji = "🌌 ";
+          else if (/예약|신청/.test(p1)) emoji = "📝 ";
+          else if (/주의|필수/.test(p1)) emoji = "⚠️ ";
+          else if (/확인|완료/.test(p1)) emoji = "✅ ";
+          return `<strong>${emoji}${p1}</strong>`;
+        });
+
+        // 링크 처리
+        text = text.replace(/(https?:\/\/[^\s]+)/g, function (url) {
+          return `<a href="${url}" target="_blank">${url}</a>`;
+        });
+
+        return text;
+      }
+
+      function handleKey(event) {
+        if (event.key === "Enter") {
+          send();
+        }
+      }
+
+      function handleNameKey(event) {
+        if (event.key === "Enter") {
+          setName();
+        }
+      }
+
+      function setName() {
+        const nameInput = document.getElementById("name_input").value.trim();
+        if (!nameInput) return;
+
+        userName = nameInput;
+        document.getElementById("name_prompt").classList.add("hidden");
+        document.getElementById("chat_ui").classList.remove("hidden");
+
+        document.getElementById("chat_box").innerHTML += `
+        <div class="bubble bot">${userName}님, 무엇을 도와드릴까요?</div>
+      `;
+      }
+
+      async function send() {
+        const input = document.getElementById("user_input").value;
+        if (!input.trim()) return;
+
+        document.getElementById("chat_box").innerHTML += `
+        <div class="bubble user">${input}</div>
+      `;
+
+        document.getElementById("user_input").value = "";
+
+        const res = await fetch("http://127.0.0.1:8000/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_name: userName, user_input: input }),
+        });
+
+        const data = await res.json();
+
+        document.getElementById("chat_box").innerHTML += `
+        <div class="bubble bot">${formatReply(data.reply)}</div>
+      `;
+
+        document.getElementById("chat_box").scrollTop =
+          document.getElementById("chat_box").scrollHeight;
+      }
+    </script>
+  </body>
+</html>
